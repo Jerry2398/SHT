@@ -26,5 +26,7 @@ def ParseArgs():
 	parser.add_argument('--tstEpoch', default=3, type=int, help='number of epoch to test while training')
 	parser.add_argument('--gpu', default='2', type=str, help='indicates which gpu to use')
 	parser.add_argument('--edgeSampRate', default=0.1, type=float, help='Ratio of sampled edges')
+	parser.add_argument('--dropout', default=0.5, type=float, help='Ratio of transformer layer dropout')
+	parser.add_argument('--num_head', default=4, type=int, help='Multihead number of transformer layer')
 	return parser.parse_args()
 args = ParseArgs()

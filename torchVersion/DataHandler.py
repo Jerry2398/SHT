@@ -53,16 +53,53 @@ class DataHandler:
 		shape = t.Size(mat.shape)
 		return t.sparse.FloatTensor(idxs, vals, shape).cuda()
 
+	def makeMask(self):
+		u_u_mask = t.zeros(shape=(args.user, args.user), dtype=bool)
+		u_i_mask = t.ones(shape=(args.user, args.item), dtype=bool)
+
+		i_i_mask = t.zeros(shape=(args.item, args.item), dtype=bool)
+		i_u_mask = t.ones(shape=(args.item, args.user), dtype=bool)
+
+		u_mask = t.concat([u_u_mask, u_i_mask], dim=-1)
+		i_mask = t.concat([i_u_mask, i_i_mask], dim=-1)
+
+		mask = t.concat([u_mask, i_mask], dim=0)
+		return mask
+
+
 	def LoadData(self):
 		trnMat = self.loadOneFile(self.trnfile)
 		tstMat = self.loadOneFile(self.tstfile)
 		args.user, args.item = trnMat.shape
 		self.torchBiAdj = self.makeTorchAdj(trnMat)
-		
+		self.mask = self.makeMask()
+
 		trnData = TrnData(trnMat)
 		self.trnLoader = dataloader.DataLoader(trnData, batch_size=args.batch, shuffle=True, num_workers=0)
 		tstData = TstData(tstMat, trnMat)
 		self.tstLoader = dataloader.DataLoader(tstData, batch_size=args.tstBat, shuffle=False, num_workers=0)
+
+class TrnMaskedData(data.Dataset):
+	def __init__(self, coomat):
+		self.rows = coomat.row
+		self.cols = coomat.col
+		self.dokmat = coomat.todok()
+		self.negs = np.zeros(len(self.rows)).astype(np.int32)
+
+	def negSampling(self):
+		for i in range(len(self.rows)):
+			u = self.rows[i]
+			while True:
+				iNeg = np.random.randint(args.item)
+				if (u, iNeg) not in self.dokmat:
+					break
+			self.negs[i] = iNeg
+
+	def __len__(self):
+		return len(self.rows)
+
+	def __getitem__(self, idx):
+		return self.rows[idx], self.cols[idx], self.negs[idx]
 
 class TrnData(data.Dataset):
 	def __init__(self, coomat):

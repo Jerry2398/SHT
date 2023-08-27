@@ -70,7 +70,7 @@ class Coach:
 			poss = poss.long().cuda()
 			negs = negs.long().cuda()
 
-			bprLoss, sslLoss = self.model.calcLosses(ancs, poss, negs, self.handler.torchBiAdj)
+			bprLoss, sslLoss = self.model.calcLosses(ancs, poss, negs, self.handler.torchBiAdj, self.handler.mask)
 			sslLoss = sslLoss
 
 			regLoss = calcRegLoss(self.model) * args.reg
@@ -96,7 +96,7 @@ class Coach:
 			i += 1
 			usr = usr.long().cuda()
 			trnMask = trnMask.cuda()
-			usrEmbeds, itmEmbeds = self.model.predict(self.handler.torchBiAdj)
+			usrEmbeds, itmEmbeds = self.model.predict(self.handler.torchBiAdj, self.handler.mask)
 
 			allPreds = t.mm(usrEmbeds[usr], t.transpose(itmEmbeds, 1, 0)) * (1 - trnMask) - trnMask * 1e8
 			_, topLocs = t.topk(allPreds, args.topk)
