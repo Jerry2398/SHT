@@ -16,18 +16,33 @@ class Model(nn.Module):
         self.iEmbeds = nn.Parameter(init(t.empty(args.item, args.latdim)))
         self.uHyper = nn.Parameter(init(t.empty(args.hyperNum, args.latdim)))
         self.iHyper = nn.Parameter(init(t.empty(args.hyperNum, args.latdim)))
-        self.transformer_encoder = Encoder_Layer(embedding_dim=args.latdim, hidden_dim=args.latdim, num_heads=args.num_head, dropout=args.dropout)
+        self.user_transformer_encoder = Encoder_Layer(embedding_dim=args.latdim, hidden_dim=args.latdim, num_heads=args.num_head, dropout=args.dropout)
+        self.item_transformer_encoder = Encoder_Layer(embedding_dim=args.latdim, hidden_dim=args.latdim, num_heads=args.num_head, dropout=args.dropout)
     
-    def transformer_layer(self, embeds, mask=None):
+
+    def user_transformer_layer(self, embeds, mask=None):
         assert embeds.shape <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
         if len(embeds.shape) == 2:
-            embeds = embeds.unsequeeze(0)
-            embeds = self.transformer_encoder(embeds, embeds, embeds, mask)
-            embeds = embeds.sequeeze()
+            embeds = embeds.unsqueeze(dim=0)
+            embeds = self.user_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = embeds.squeeze()
         else:
-            embeds = self.transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = self.user_transformer_encoder(embeds, embeds, embeds, mask)
         
         return embeds
+    
+    
+    def item_transformer_layer(self, embeds, mask=None):
+        assert embeds.shape <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
+        if len(embeds.shape) == 2:
+            embeds = embeds.unsqueeze(dim=0)
+            embeds = self.item_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = embeds.squeeze()
+        else:
+            embeds = self.item_transformer_encoder(embeds, embeds, embeds, mask)
+        
+        return embeds
+    
 
     def gcnLayer(self, adj, embeds):
         return t.spmm(adj, embeds)
@@ -36,13 +51,20 @@ class Model(nn.Module):
         # HGNN can also be seen as learning a transformation in hidden space, with args.hyperNum hidden units (hyperedges)
         return embeds @ (hyper.T @ hyper)# @ (embeds.T @ embeds)
     
-    def forward(self, adj, mask=None):
+    def forward(self, adj):
         embeds = t.concat([self.uEmbeds, self.iEmbeds], dim=0)
         lats = [embeds]
         for i in range(args.gcn_hops):
             temlat = self.gcnLayer(adj, lats[-1])
-            temlat = self.transformer_layer(temlat, mask)
+
+            user_embeddings = temlat[:args.user]
+            item_embeddings = temlat[args.user:]
+
+            user_temlat = self.user_transformer_layer(user_embeddings)
+            item_temlat = self.item_transformer_layer(item_embeddings)
+            temlat = t.concat([user_temlat, item_temlat], dim=0)
             lats.append(temlat)
+
         embeds = sum(lats)
         # this detach helps eliminate the mutual influence between the local GCN and the global HGNN
         hyperUEmbeds = self.hgnnLayer(embeds[:args.user].detach(), self.uHyper)
@@ -78,8 +100,8 @@ class Model(nn.Module):
         bprLoss = - ((scoreDiff).sigmoid() + 1e-6).log().mean()
         return bprLoss
     
-    def calcLosses(self, ancs, poss, negs, adj, mask=None):
-        embeds, hyperU, hyperI = self.forward(adj, mask)
+    def calcLosses(self, ancs, poss, negs, adj):
+        embeds, hyperU, hyperI = self.forward(adj)
         uEmbeds, iEmbeds = embeds[:args.user], embeds[args.user:]
 
         bprLoss = self.bprLoss(uEmbeds, iEmbeds, ancs, poss, negs) + self.bprLoss(hyperU, hyperI, ancs, poss, negs)
@@ -105,6 +127,6 @@ class Model(nn.Module):
             sslLoss = 0
         return bprLoss, sslLoss
     
-    def predict(self, adj, mask=None):
-        embeds, hyperU, hyperI = self.forward(adj, mask)
+    def predict(self, adj):
+        embeds, hyperU, hyperI = self.forward(adj)
         return hyperU, hyperI

@@ -53,6 +53,11 @@ class DataHandler:
 		shape = t.Size(mat.shape)
 		return t.sparse.FloatTensor(idxs, vals, shape).cuda()
 
+	def makeSample(self):
+		user_sample_idx = t.tensor([[args.user + i for i in range(args.item)] * args.user])
+		item_sample_idx = t.tensor([[i for i in range(args.user)] * args.item])
+		return user_sample_idx, item_sample_idx
+
 	def makeMask(self):
 		u_u_mask = t.zeros(shape=(args.user, args.user), dtype=bool)
 		u_i_mask = t.ones(shape=(args.user, args.item), dtype=bool)
@@ -73,6 +78,7 @@ class DataHandler:
 		args.user, args.item = trnMat.shape
 		self.torchBiAdj = self.makeTorchAdj(trnMat)
 		self.mask = self.makeMask()
+		# self.user_sample_idx, self.item_sample_idx = self.makeSample()
 
 		trnData = TrnData(trnMat)
 		self.trnLoader = dataloader.DataLoader(trnData, batch_size=args.batch, shuffle=True, num_workers=0)
