@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from Params import args
 from Utils.Utils import pairPredict
-from Transformer import Encoder_Layer
+from Transformer import Encoder_Layer, TransformerEncoderLayer
 
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
@@ -16,30 +16,30 @@ class Model(nn.Module):
         self.iEmbeds = nn.Parameter(init(t.empty(args.item, args.latdim)))
         self.uHyper = nn.Parameter(init(t.empty(args.hyperNum, args.latdim)))
         self.iHyper = nn.Parameter(init(t.empty(args.hyperNum, args.latdim)))
-        self.user_transformer_encoder = Encoder_Layer(embedding_dim=args.latdim, hidden_dim=args.latdim, num_heads=args.num_head, dropout=args.dropout)
-        self.item_transformer_encoder = Encoder_Layer(embedding_dim=args.latdim, hidden_dim=args.latdim, num_heads=args.num_head, dropout=args.dropout)
+        self.user_transformer_encoder = TransformerEncoderLayer(d_model=args.latdim, num_heads=args.num_head, dropout=args.dropout)
+        self.item_transformer_encoder = TransformerEncoderLayer(d_model=args.latdim, num_heads=args.num_head, dropout=args.dropout)
     
 
     def user_transformer_layer(self, embeds, mask=None):
-        assert embeds.shape <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
+        assert len(embeds.shape) <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
         if len(embeds.shape) == 2:
             embeds = embeds.unsqueeze(dim=0)
-            embeds = self.user_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = self.user_transformer_encoder(embeds, mask)
             embeds = embeds.squeeze()
         else:
-            embeds = self.user_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = self.user_transformer_encoder(embeds, mask)
         
         return embeds
     
     
     def item_transformer_layer(self, embeds, mask=None):
-        assert embeds.shape <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
+        assert len(embeds.shape) <= 3, "Shape Error, embed shape is {}, out of size!".format(embeds.shape)
         if len(embeds.shape) == 2:
             embeds = embeds.unsqueeze(dim=0)
-            embeds = self.item_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = self.item_transformer_encoder(embeds, mask)
             embeds = embeds.squeeze()
         else:
-            embeds = self.item_transformer_encoder(embeds, embeds, embeds, mask)
+            embeds = self.item_transformer_encoder(embeds, mask)
         
         return embeds
     
