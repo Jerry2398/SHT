@@ -11,15 +11,15 @@ import torch.utils.data as dataloader
 class DataHandler:
 	def __init__(self):
 		if args.data == 'yelp':
-			predir = '/home/akaxia/data/hccf&sht data/yelp/'
+			predir = '/root/peiyan_zhang/SHT/Data/yelp/'
 		elif args.data == 'amazon':
-			predir = '/home/akaxia/data/hccf&sht data/amazon/'
+			predir = '/root/peiyan_zhang/SHT/Data/amazon/'
 		elif args.data == 'ml10m':
-			predir = '/home/akaxia/data/hccf&sht data/ml10m/'
+			predir = '/root/peiyan_zhang/SHT/Data/ml10m/'
 		elif args.data == 'tmall':
-			predir = '/home/akaxia/data/hccf&sht data/tmall/'
+			predir = '/root/peiyan_zhang/SHT/Data/tmall/'
 		elif args.data == 'gowalla':
-			predir = '/home/akaxia/data/hccf&sht data/gowalla/'
+			predir = '/root/peiyan_zhang/SHT/Data/gowalla/'
 		self.predir = predir
 		self.trnfile = predir + 'trnMat.pkl'
 		self.tstfile = predir + 'tstMat.pkl'
@@ -59,11 +59,11 @@ class DataHandler:
 		return user_sample_idx, item_sample_idx
 
 	def makeMask(self):
-		u_u_mask = t.zeros(shape=(args.user, args.user), dtype=bool)
-		u_i_mask = t.ones(shape=(args.user, args.item), dtype=bool)
+		u_u_mask = t.zeros(size=(args.user, args.user), dtype=bool)
+		u_i_mask = t.ones(size=(args.user, args.item), dtype=bool)
 
-		i_i_mask = t.zeros(shape=(args.item, args.item), dtype=bool)
-		i_u_mask = t.ones(shape=(args.item, args.user), dtype=bool)
+		i_i_mask = t.zeros(size=(args.item, args.item), dtype=bool)
+		i_u_mask = t.ones(size=(args.item, args.user), dtype=bool)
 
 		u_mask = t.concat([u_u_mask, u_i_mask], dim=-1)
 		i_mask = t.concat([i_u_mask, i_i_mask], dim=-1)
