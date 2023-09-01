@@ -5,6 +5,7 @@ import numpy as np
 import os
 import torch_geometric.nn as pygnn
 import math
+from masking import FullMask, LengthMask
 
 
 class ScaledDotProAttention(nn.Module):
@@ -55,6 +56,80 @@ class FFN(nn.Module):
 
         return output
 
+class TransformerEncoderLayer(nn.Module):
+    """Self attention and feed forward network with skip connections.
+
+    This transformer encoder layer implements the same encoder layer as
+    PyTorch but is a bit more open for extension by receiving the attention
+    implementation as a constructor argument.
+
+    Arguments
+    ---------
+        attention: The attention implementation to use given as a nn.Module
+        d_model: The input feature dimensionality
+        d_ff: The dimensionality of the intermediate features after the
+              attention (default: d_model*4)
+        dropout: The dropout rate to apply to the intermediate features
+                 (default: 0.1)
+        activation: {'relu', 'gelu'} Which activation to use for the feed
+                    forward part of the layer (default: relu)
+        event_dispatcher: str or EventDispatcher instance to be used by this
+                          module for dispatching events (default: the default
+                          global dispatcher)
+    """
+    def __init__(self, d_model, num_heads=8, d_ff=None, dropout=0.1,
+                 activation="relu"):
+        super(TransformerEncoderLayer, self).__init__()
+        d_ff = d_ff or 4*d_model
+        self.attention = nn.MultiheadAttention(d_model, num_heads, dropout=dropout)
+        self.linear1 = nn.Linear(d_model, d_ff)
+        self.linear2 = nn.Linear(d_ff, d_model)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+        self.activation = getattr(F, activation)
+
+    def forward(self, x, attn_mask=None, length_mask=None):
+        """Apply the transformer encoder to the input x.
+
+        Arguments
+        ---------
+            x: The input features of shape (N, L, E) where N is the batch size,
+               L is the sequence length (padded) and E is d_model passed in the
+               constructor.
+            attn_mask: An implementation of fast_transformers.masking.BaseMask
+                       that encodes where each element of x can attend to.
+            length_mask: An implementation of
+                         fast_transformers.masking.BaseMask that encodes how
+                         many elements each sequence in the batch consists of.
+        """
+        # Normalize the masks
+        N = x.shape[0]
+        L = x.shape[1]
+        # print("attn_mask.dtype")
+        # print(attn_mask.dtype)
+        # attn_mask = attn_mask or FullMask(L, device=x.device)
+
+        # length_mask = length_mask or \
+        #     LengthMask(x.new_full((N,), L, dtype=torch.int64))
+
+        # Run self attention and add it to the input
+        
+        attn_output, _ = self.attention(
+            x, x, x,
+            key_padding_mask=attn_mask
+        )
+        
+        x = x + self.dropout(attn_output)
+
+        # Run the fully connected part of the layer
+        y = x = self.norm1(x)
+        y = self.dropout(self.activation(self.linear1(y)))
+        y = self.dropout(self.linear2(y))
+
+        return self.norm2(x+y)
+    
+
 class Encoder_Layer(nn.Module):
     def __init__(self, embedding_dim=128, hidden_dim=64, num_heads=8, dropout=0):
         super(Encoder_Layer, self).__init__()
@@ -87,6 +162,12 @@ class Encoder_Layer(nn.Module):
         self.relu2 = nn.LeakyReLU()
 
     def forward(self, querys, keys, values, mask=None):
+        # print("query.shape")        #[1, 29601, 32]
+        # print(querys.shape)
+        # print("keys.shape")         #[1, 29601, 32]
+        # print(keys.shape)
+        # print("values.shape")       #[1, 29601, 32]
+        # print(values.shape)
         query = self.calculate_q(querys).transpose(0, 1).contiguous()
         key = self.calculate_k(keys).transpose(0, 1).contiguous()
         value = self.calculate_v(values).transpose(0, 1).contiguous()
@@ -104,6 +185,9 @@ class Encoder_Layer(nn.Module):
         output = tmp + self.dropout2(output)
         output = self.layer_norm2(output)
 
+        # print("output.shape")
+        # print(output.shape)
+        
         return output
 
 
